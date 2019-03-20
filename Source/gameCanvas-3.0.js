@@ -6,12 +6,13 @@ function GameCanvas(canvas, width, height, settings) {
         width = "FULLSCREEN";
     }
     
+    if (typeof canvas === "string") canvas = document.getElementById(canvas);
     this.canvas = canvas || document.body.appendChild(document.createElement("canvas"));
     
     width = width || "FULLSCREEN";
     if (width == "FULLSCREEN") {
         settings = height || settings;
-        document.body.style = (settings && settings.appliedBodyStyle) || "padding: 0;margin: 0;";
+        document.body.style = (settings && settings.appliedBodyStyle) || "padding: 0;margin: 0;overflow: hidden;";
         this.canvas.height = window.innerHeight;
     }
     else {
@@ -37,7 +38,8 @@ function GameCanvas(canvas, width, height, settings) {
     
     TODO:
         * Buttons with click events
-        * Canvas pixel manipulation
+        * Fix gradient
+        * Clip function
         
     */
     
@@ -50,7 +52,7 @@ function GameCanvas(canvas, width, height, settings) {
     this.topFunction.isItWorking = function() {
         msg = "Yup, it's working!\n(This function can be removed from your code now if you want)";
         console.log(msg);
-    }
+    };
     
     /*
     +------------------------------+
@@ -62,14 +64,19 @@ function GameCanvas(canvas, width, height, settings) {
         if (typeof preload !== 'undefined' && typeof preload === 'function')
             preload();
         else {
+            _this.callFunctions();
+        }
+    };
+    
+    this.callFunctions = function() {
+        typeof start !== 'undefined' && start();
+        if (typeof loop !== 'undefined') {
             var oldLoop = loop;
             loop = function() {
                 oldLoop();
                 requestAnimationFrame(loop);
-            }
-        
-            try{start();}catch(e){console.log(e)}
-            try{loop();}catch(e){console.log(e)}
+            };
+            loop();
         }
     };
     
@@ -84,12 +91,19 @@ function GameCanvas(canvas, width, height, settings) {
         _this.ctx.clearRect(0, 0, _this.canvas.width, _this.canvas.height);
     };
     
+    //Fill screen
+    this.topFunction.background = function(color) {
+        _this.ctx.beginPath();
+        _this.ctx.fillStyle = color;
+        _this.ctx.fillRect(0, 0, _this.topFunction.width, _this.topFunction.height);
+        _this.ctx.closePath();
+    }
+    
     //DrawRectangle
     this.topFunction.drawRectangle = function(x, y, width, height, fill, stroke, settings) {
         _this.ctx.beginPath();
         _this.ctx.rect(x, y, width, height);
         
-        _this.ctx.closePath();
         _this.topFunction.renderShape(fill, stroke, settings);
     };
     this.topFunction.rect = this.topFunction.drawRectangle;
@@ -107,8 +121,8 @@ function GameCanvas(canvas, width, height, settings) {
     this.topFunction.circle = this.topFunction.drawCircle;
     
     //DrawRing
-    this.topFunction.drawRing = function(x, y, radius, fill, stroke, lineWidth) {
-        _this.topFunction.drawCircle(x, y, radius, "", color, {lineWidth: lineWidth});
+    this.topFunction.drawRing = function(x, y, radius, color, lineWidth) {
+        _this.topFunction.drawCircle(x, y, radius, "", color, lineWidth ? {lineWidth: lineWidth} : undefined);
     };
     this.topFunction.ring = this.topFunction.drawRing;
     
@@ -135,17 +149,17 @@ function GameCanvas(canvas, width, height, settings) {
     this.topFunction.tri = this.topFunction.drawTriangle;
     
     //DrawTriangleEquilateral
-    this.topFunction.drawTriangleEquilateral = function(x, y, radius, color, settings) {
+    this.topFunction.drawTriangleEquilateral = function(x, y, radius, fill, stroke, settings) {
         var x1 = x + Math.cos(30 * Math.PI / 180) * ((settings && settings.width) || radius);
         var y1 = y + Math.sin(30 * Math.PI / 180) * ((settings && settings.height) || radius);
         
         var x2 = x + Math.cos(150 * Math.PI / 180) * ((settings && settings.width) || radius);
         var y2 = y + Math.sin(150 * Math.PI / 180) * ((settings && settings.height) || radius);
         
-        var x3 = x
+        var x3 = x;
         var y3 = y - radius;
         
-        _this.topFunction.drawTriangle(x1, y1, x2, y2, x3, y3, color, settings);
+        _this.topFunction.drawTriangle(x1, y1, x2, y2, x3, y3, fill, stroke, settings);
     };
     this.topFunction.triangleEq = this.topFunction.drawTriangleEquilateral;
     
@@ -170,7 +184,7 @@ function GameCanvas(canvas, width, height, settings) {
         
         _this.ctx.closePath();
         _this.topFunction.renderShape(fill, stroke, settings);
-    }
+    };
     this.topFunction.ellipse = this.topFunction.drawEllipse;
     this.topFunction.oval = this.topFunction.drawEllipse;
     
@@ -185,14 +199,7 @@ function GameCanvas(canvas, width, height, settings) {
             img.onload = function() {
                 _this.imagesToLoad--;
                 if (_this.imagesToLoad <= 0) {
-                    var oldLoop = loop;
-                    loop = function() {
-                        oldLoop();
-                        requestAnimationFrame(loop);
-                    }
-                
-                    try{start();}catch(e){console.log(e)}
-                    try{loop();}catch(e){console.log(e)}
+                    _this.callFunctions();
                 }
                 console.log("Image preloaded! " + img.src);
             }
@@ -329,12 +336,18 @@ function GameCanvas(canvas, width, height, settings) {
     
     //DrawText
     this.topFunction.drawText = function(text, x, y, fontSize, fill, stroke, settings) {
+        if (typeof stroke === "object" && stroke.toString() === "[object Object]") {
+            settings = stroke;
+            stroke = "";
+        }
         _this.ctx.beginPath();
         _this.ctx.font = (fontSize || 30) + "px " + (settings && settings.fontFamily) || "Arial";
         
         _this.ctx.textAlign = (settings && settings.alignText) || "left";
+        _this.ctx.lineWidth = (settings && settings.lineWidth) || 2;
         _this.ctx.closePath();
-        _this.topFunction.renderShape(fill, stroke, settings);
+        if (fill) {_this.ctx.fillStyle = fill; _this.ctx.fillText(text, x, y);}
+        if (stroke) {_this.ctx.strokeStyle = stroke; _this.ctx.strokeText(text, x, y);}
     }
     this.topFunction.text = this.topFunction.drawText;
     
@@ -412,6 +425,41 @@ function GameCanvas(canvas, width, height, settings) {
     
     /*
     +------------------------------+
+    |      Pixel manipulation      |
+    +------------------------------+
+    */
+    
+    this.topFunction.pixels = [];
+    this.imageData;
+    
+    this.topFunction.updatePixelData = function() {
+        _this.imageData = _this.ctx.getImageData(0, 0, _this.canvas.width, _this.canvas.height);
+        _this.topFunction.pixels = _this.imageData.data;
+    }
+    
+    this.topFunction.updatePixel = function(x, y, r, g, b, a) {
+        var index = (x + y * _this.canvas.width) * 4;
+        _this.topFunction.pixels[index    ] = r;
+        _this.topFunction.pixels[index + 1] = g;
+        _this.topFunction.pixels[index + 2] = b;
+        _this.topFunction.pixels[index + 3] = typeof a === 'undefined' ? 255 : a;
+    }
+    
+    this.topFunction.readPixel = function(x, y) {
+        var index = (x + y * _this.canvas.width) * 4;
+        return [_this.topFunction.pixels[index],
+                _this.topFunction.pixels[index + 1],
+                _this.topFunction.pixels[index + 2],
+                _this.topFunction.pixels[index + 3]];
+    }
+    
+    this.topFunction.renderPixelData = function() {
+        _this.ctx.putImageData(_this.imageData, 0, 0);
+    }
+    
+    
+    /*
+    +------------------------------+
     |             Math             |
     +------------------------------+
     */
@@ -444,6 +492,27 @@ function GameCanvas(canvas, width, height, settings) {
             return Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
         else if ((settings && settings.angleMode && (settings.angleMode.toUpperCase() == "RAD" || settings.angleMode.toUpperCase() == "RADIUS")) || !settings)
             return Math.atan2(y2 - y1, x2 - x1);
+    }
+    
+    //Random functions
+    
+    this.topFunction.random = function(min, max) {
+        if (typeof max == "undefined")
+            return Math.random() * min;
+        else
+            return Math.random() * (max - min) + min;
+    }
+    
+    this.topFunction.randomInt = function(min, max) {
+        if (typeof max == "undefined")
+            return (Math.random() * min) >> 0;
+        else
+            return (Math.random() * (max - min) + min) >> 0;
+    }
+    this.topFunction.random = this.topFunction.randomInt;
+    
+    this.topFunction.randomArray = function(array) {
+        return array[(Math.random() * array.length) >> 0];
     }
     
     
@@ -483,6 +552,18 @@ function GameCanvas(canvas, width, height, settings) {
         return [b, a];
     }
     
+    this.topFunction.createArray = function(n, lengths) {
+        return create2dArray(0, n, lengths || 10);
+    }
+    
+    function create2dArray(count, n, lengths) {
+        var a = new Array(lengths);
+        for (var i = 0; i < a.length; i++) {
+            a[i] = count < n - 2 ? create2dArray(count + 1, n, lengths) : new Array(lengths);
+        }
+        return a;
+    }
+    
     
     /*
     +------------------------------+
@@ -494,8 +575,9 @@ function GameCanvas(canvas, width, height, settings) {
     this.topFunction.mouse = {x: 0, y: 0, left: false, middle: false, right: false};
     this.topFunction.mouseX = 0;
     this.topFunction.mouseY = 0;
-    this.topFunction.keyNumber = [];
-    this.topFunction.keyName = [];
+    this.topFunction.touch = {x: 0, y: 0, touching: false, touches: []};
+    this.keyNumber = [];
+    this.keyName = [];
     
     this.topFunction.isKeyPressed = function(key) {
         if (isNaN(key))
@@ -506,8 +588,9 @@ function GameCanvas(canvas, width, height, settings) {
     this.topFunction.getKey = this.topFunction.isKeyPressed;
     
     this.canvas.addEventListener("mousemove", function(e) {
-        _this.topFunction.mouse.x = _this.topFunction.mouseX = e.clientX;
-        _this.topFunction.mouse.y = _this.topFunction.mouseY = e.clientY;
+        var rect = _this.canvas.getBoundingClientRect();
+        _this.topFunction.mouse.x = _this.topFunction.mouseX = Math.round((e.clientX - rect.left) * (_this.topFunction.width / rect.width));
+        _this.topFunction.mouse.y = _this.topFunction.mouseY = Math.round((e.clientY - rect.top) * (_this.topFunction.height / rect.height));
         typeof OnMouseMove === "function" && OnMouseMove();
     });
     
@@ -538,18 +621,58 @@ function GameCanvas(canvas, width, height, settings) {
                 _this.topFunction.mouse.right = false;
                 break;
         }
-        typeof OnMouseUp=== "function" && OnMouseUp();
+        typeof OnMouseUp === "function" && OnMouseUp();
     });
     
+    this.canvas.addEventListener("touchstart", function(e) {
+        e.preventDefault();
+        changeTouch(e);
+        _this.topFunction.touch.x = e.touches[0].pageX;
+        _this.topFunction.touch.y = e.touches[0].pageY;
+        _this.topFunction.touch.touching = true;
+        
+        typeof OnTouchStart === "function" && OnTouchStart();
+    });
+    
+    this.canvas.addEventListener("touchend", function(e) {
+        e.preventDefault();
+        changeTouch(e);
+        _this.topFunction.touch.touching = false;
+        
+        typeof OnTouchEnd === "function" && OnTouchEnd();
+    });
+    
+    this.canvas.addEventListener("touchmove", function(e) {
+        e.preventDefault();
+        changeTouch(e);
+        if (_this.settings.setMouseToTouch) {
+            _this.topFunction.touch.x = _this.topFunction.mouse.x = _this.topFunction.mouseX = e.touches[0].pageX;
+            _this.topFunction.touch.y = _this.topFunction.mouse.y = _this.topFunction.mouseY = e.touches[0].pageY;
+        }
+        else {
+            _this.topFunction.touch.x = e.touches[0].pageX;
+            _this.topFunction.touch.y = e.touches[0].pageY;
+        }
+        
+        typeof OnTouchMove === "function" && OnTouchMove();
+    });
+    
+    var changeTouch = function(e) {
+        _this.topFunction.touch.touches = [];
+        for (var i = 0; i < e.touches.length; i++) {
+            _this.topFunction.touch.touches.push({x: e.touches[i].pageX, y: e.touches[i].pageY, id: e.touches[i].identifier});
+        }
+    }
+    
     document.addEventListener("keydown", function(e) {
-        _this.topFunction.keyNumber[e.which] = true;
-        _this.topFunction.keyName[e.key] = true;
+        _this.keyNumber[e.which] = true;
+        _this.keyName[e.key] = true;
         typeof OnKeyDown === "function" && OnKeyDown();
     });
     
     document.addEventListener("keyup", function(e) {
-        _this.topFunction.keyNumber[e.which] = false;
-        _this.topFunction.keyName[e.key] = false;
+        _this.keyNumber[e.which] = false;
+        _this.keyName[e.key] = false;
         typeof OnKeyUp === "function" && OnkeyUp();
     });
 }
